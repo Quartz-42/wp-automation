@@ -72,7 +72,8 @@ add_action('user_register', function ($user_id) {
     log_event('user_registered', $payload);
 
         // 2. Envoi à Brevo : création / mise à jour du contact
-    $brevo_data = [
+        automation_schedule_event('automation_process_brevo_event', [
+            [
         'email'      => $user->user_email,
         'attributes' => [
             'FIRSTNAME'   => $user->first_name,
@@ -84,9 +85,11 @@ add_action('user_register', function ($user_id) {
             'WP_REGISTERED_AT' => $user->user_registered,
         ],
         'updateEnabled' => true, // true = met à jour si le contact existe déjà
-    ];
+        ]
+    ]);
 
-    send_to_brevo_event($brevo_data);
+    // Marquer comme "Mis en file d'attente"
+    update_user_meta($user->ID, '_brevo_register_queued', true);
 
 }, 10, 1);
 
@@ -120,14 +123,14 @@ add_action('wp_login', function ($user_login, $user) {
     log_event('user_login', $payload);
 
     //envoi a Brevo : mise à jour du contact
-    $brevo_data = [
+    automation_schedule_event('automation_process_brevo_event', [   
+        [
         'email'      => $user->user_email,
         'attributes' => [
             'LAST_LOGIN' => $now,
         ],
         'updateEnabled' => true,
-    ];
-
-    send_to_brevo_event($brevo_data);
+        ]
+    ]);
 
 }, 10, 2);

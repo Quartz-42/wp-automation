@@ -90,18 +90,42 @@ add_action('woocommerce_thankyou', function($order_id) {
     // 1. Log local
     log_event('order_placed', $payload);
 
-    // 2. Envoi Klaviyo
+    // 2. Envoi Klaviyo mail remerciement + détails commande
     send_to_klaviyo_event('Placed Order', $order->get_billing_email(), [
         'OrderId'   => $order_id,
         'Value'     => $order->get_total(),
         'ItemNames' => $payload['items'],
-        'Currency'  => $order->get_currency()
+        'Currency'  => $order->get_currency(),
+        'CustomerName' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name()
     ]);
+
+    // 3. Envoi Klaviyo pour le GESTIONNAIRE BOUTIQUE
+    $shop_managers = get_users(['role' => 'shop_manager']);
+    
+    // Fallback sur l'admin si aucun gestionnaire
+    if (empty($shop_managers)) {
+        $shop_managers = [get_user_by('email', get_option('admin_email'))];
+    }
+
+    foreach ($shop_managers as $manager) {
+        if ($manager && !empty($manager->user_email)) {
+            // On envoie un événement "Admin Notification" sur le profil du gestionnaire
+            send_to_klaviyo_event('Admin New Sale Notification', $manager->user_email, [
+                'SaleAmount'   => $order->get_total(),
+                'Currency'     => $order->get_currency(),
+                'CustomerName' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'CustomerEmail'=> $order->get_billing_email(),
+                'OrderId'      => $order_id,
+                'Items'        => $payload['items']
+            ]);
+        }
+    }
 
     // Marquer comme envoyé
     update_post_meta($order_id, '_klaviyo_sent', true);
 
 }, 10, 1);
+
 
 /**
  * EVENT 4 : Produit ajouté au panier
